@@ -91,12 +91,11 @@
     <input type="date" id="date" required>
     <input type="text" id="from" placeholder="From" required>
     <input type="text" id="to" placeholder="To" required>
-    <input type="number" id="travel" placeholder="Travelling Cost (₹)" required>
-    <input type="number" id="da" placeholder="DA (₹)" required>
-    <input type="number" id="daClaim" placeholder="DA Claim (₹)" required>
+    <input type="text" id="travel" placeholder="Travelling Cost (₹)" required>
+    <input type="text" id="da" placeholder="DA (₹)" required>
+    <input type="text" id="daClaim" placeholder="DA Claim (₹)" required>
     <button type="submit">Add Entry</button>
     <button type="button" onclick="exportToExcel()">Download Excel</button>
-    <button type="button" onclick="exportToJSON()">Save File</button>
     <input type="file" id="fileInput" accept=".json" onchange="importFromJSON()">
     <button type="button" onclick="sendToGoogleSheets()">Send to Google Sheet</button>
     <button type="button" onclick="window.print()">Print</button>
@@ -149,24 +148,25 @@
       addEntry();
     });
 
-    function addEntry(entry = null, index = null) {
+    function parseValue(input) {
+      return input.split('+').reduce((sum, val) => sum + parseFloat(val.trim() || 0), 0);
+    }
+
+    function addEntry(entry = null) {
       const date = entry ? entry[0] : document.getElementById('date').value;
       const from = entry ? entry[1] : document.getElementById('from').value;
       const to = entry ? entry[2] : document.getElementById('to').value;
-      const travel = entry ? entry[3] : parseFloat(document.getElementById('travel').value);
-      const da = entry ? entry[4] : parseFloat(document.getElementById('da').value);
-      const daClaim = entry ? entry[5] : parseFloat(document.getElementById('daClaim').value);
+      const travelRaw = entry ? entry[6] : document.getElementById('travel').value;
+      const daRaw = entry ? entry[7] : document.getElementById('da').value;
+      const daClaimRaw = entry ? entry[8] : document.getElementById('daClaim').value;
+
+      const travel = parseValue(travelRaw);
+      const da = parseValue(daRaw);
+      const daClaim = parseValue(daClaimRaw);
 
       if (!date || !from || !to || isNaN(travel) || isNaN(da) || isNaN(daClaim)) return;
 
-      const newRow = [date, from, to, travel, da, daClaim];
-
-      if (index !== null) {
-        entries[index] = newRow;
-      } else {
-        entries.push(newRow);
-      }
-
+      entries.push([date, from, to, travel, da, daClaim, travelRaw, daRaw, daClaimRaw]);
       renderTable();
       form.reset();
     }
@@ -175,24 +175,48 @@
       tableBody.innerHTML = "";
       if (entries.length === 0) {
         noDataMsg.style.display = "block";
-      } else {
-        noDataMsg.style.display = "none";
-        entries.forEach((row, idx) => {
+        return;
+      }
+      noDataMsg.style.display = "none";
+
+      const grouped = {};
+      entries.forEach((e, i) => {
+        const key = `${e[0]}-${e[1]}-${e[2]}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push({ row: e, index: i });
+      });
+
+      for (const key in grouped) {
+        let totalTravel = 0, totalDA = 0, totalDAClaim = 0;
+        grouped[key].forEach(({ row, index }) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${row[0]}</td>
             <td>${row[1]} ➝ ${row[2]}</td>
-            <td>${row[3].toFixed(2)}</td>
-            <td>${row[4].toFixed(2)}</td>
-            <td>${row[5].toFixed(2)}</td>
+            <td>${row[6]} = ${row[3].toFixed(2)}</td>
+            <td>${row[7]} = ${row[4].toFixed(2)}</td>
+            <td>${row[8]} = ${row[5].toFixed(2)}</td>
             <td>
-              <button onclick="editRow(${idx})">Edit</button>
-              <button onclick="deleteRow(${idx})">Delete</button>
-            </td>
-          `;
+              <button onclick="editRow(${index})">Edit</button>
+              <button onclick="deleteRow(${index})">Delete</button>
+            </td>`;
           tableBody.appendChild(tr);
+          totalTravel += row[3];
+          totalDA += row[4];
+          totalDAClaim += row[5];
         });
+
+        const sumRow = document.createElement('tr');
+        sumRow.style.fontWeight = "bold";
+        sumRow.innerHTML = `
+          <td colspan="2">Subtotal</td>
+          <td>₹${totalTravel.toFixed(2)}</td>
+          <td>₹${totalDA.toFixed(2)}</td>
+          <td>₹${totalDAClaim.toFixed(2)}</td>
+          <td></td>`;
+        tableBody.appendChild(sumRow);
       }
+
       updateTotals();
     }
 
@@ -201,9 +225,9 @@
       document.getElementById('date').value = row[0];
       document.getElementById('from').value = row[1];
       document.getElementById('to').value = row[2];
-      document.getElementById('travel').value = row[3];
-      document.getElementById('da').value = row[4];
-      document.getElementById('daClaim').value = row[5];
+      document.getElementById('travel').value = row[6];
+      document.getElementById('da').value = row[7];
+      document.getElementById('daClaim').value = row[8];
       entries.splice(index, 1);
       renderTable();
     }
@@ -223,25 +247,16 @@
     }
 
     function exportToExcel() {
-      const headers = ["Date", "From", "To", "Travelling Cost (₹)", "DA (₹)", "DA Claim (₹)"];
+      const headers = ["Date", "From", "To", "Travelling Cost", "DA", "DA Claim", "Travelling Raw", "DA Raw", "DA Claim Raw"];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...entries]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Expenses");
       XLSX.writeFile(wb, "TravelExpenses.xlsx");
     }
 
-    function exportToJSON() {
-      const blob = new Blob([JSON.stringify(entries)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "TravelExpenses.json";
-      a.click();
-    }
-
     function importFromJSON() {
       const file = document.getElementById('fileInput').files[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = function (e) {
         try {
@@ -260,7 +275,7 @@
     }
 
     function sendToGoogleSheets() {
-      const sheetURL = "YOUR_GOOGLE_APPS_SCRIPT_WEBAPP_URL"; // Replace this!
+      const sheetURL = "YOUR_GOOGLE_APPS_SCRIPT_WEBAPP_URL";
       fetch(sheetURL, {
         method: "POST",
         body: JSON.stringify(entries),
