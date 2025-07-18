@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Daily Travel Expense Tracker</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.json" />
   <style>
     :root {
       --bg: #ffffff;
       --text: #000000;
       --input-bg: #f0f0f0;
+
       --table-bg: #ffffff;
     }
     body.dark {
@@ -18,14 +19,12 @@
       --input-bg: #333333;
       --table-bg: #2b2b2b;
     }
-
     body {
       font-family: Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       margin: 20px;
     }
-
     input, button {
       padding: 8px;
       margin: 5px;
@@ -33,43 +32,36 @@
       color: var(--text);
       border: 1px solid #ccc;
     }
-
     #tableContainer {
       max-height: 300px;
       overflow-y: auto;
       margin-top: 20px;
       border: 1px solid #ccc;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       min-width: 600px;
       background: var(--table-bg);
     }
-
     th, td {
       border: 1px solid #ccc;
       padding: 10px;
       text-align: center;
     }
-
     .summary {
       margin-top: 15px;
       font-weight: bold;
     }
-
     .no-data {
       text-align: center;
       padding: 20px;
       color: gray;
     }
-
     .theme-toggle {
       float: right;
       margin-bottom: 10px;
     }
-
     @media print {
       form, button, .summary, .theme-toggle, #fileInput {
         display: none;
@@ -82,21 +74,22 @@
   </style>
 </head>
 <body>
-
-  <h2>Daily Travel Expense Tracker
+  <h2>
+    Daily Travel Expense Tracker
     <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
   </h2>
 
   <form id="expenseForm">
-    <input type="date" id="date" required>
-    <input type="text" id="from" placeholder="From" required>
-    <input type="text" id="to" placeholder="To" required>
-    <input type="text" id="travel" placeholder="Travelling Cost (₹)" required>
-    <input type="text" id="da" placeholder="DA (₹)" required>
-    <input type="text" id="daClaim" placeholder="DA Claim (₹)" required>
+    <input type="date" id="date" required />
+    <input type="text" id="from" placeholder="From" required />
+    <input type="text" id="to" placeholder="To" required />
+    <input type="text" id="travel" placeholder="Travelling Cost (₹)" required />
+    <input type="text" id="da" placeholder="DA (₹)" required />
+    <input type="text" id="daClaim" placeholder="DA Claim (₹)" required />
     <button type="submit">Add Entry</button>
     <button type="button" onclick="exportToExcel()">Download Excel</button>
-    <input type="file" id="fileInput" accept=".json" onchange="importFromJSON()">
+    <button type="button" onclick="newFile()">New File</button>
+    <input type="file" id="fileInput" accept=".json" onchange="importFromJSON()" />
     <button type="button" onclick="sendToGoogleSheets()">Send to Google Sheet</button>
     <button type="button" onclick="window.print()">Print</button>
   </form>
@@ -128,7 +121,7 @@
     const tableBody = document.querySelector('#expenseTable tbody');
     const noDataMsg = document.getElementById('noData');
     const totalsDisplay = document.getElementById('totals');
-    let entries = [];
+    let entries = JSON.parse(localStorage.getItem("travelEntries") || "[]");
 
     function toggleTheme() {
       document.body.classList.toggle("dark");
@@ -143,22 +136,22 @@
 
     loadTheme();
 
-    form.addEventListener('submit', function (e) {
+    form.addEventListener("submit", function (e) {
       e.preventDefault();
       addEntry();
     });
 
     function parseValue(input) {
-      return input.split('+').reduce((sum, val) => sum + parseFloat(val.trim() || 0), 0);
+      return input.split("+").reduce((sum, val) => sum + parseFloat(val.trim() || 0), 0);
     }
 
     function addEntry(entry = null) {
-      const date = entry ? entry[0] : document.getElementById('date').value;
-      const from = entry ? entry[1] : document.getElementById('from').value;
-      const to = entry ? entry[2] : document.getElementById('to').value;
-      const travelRaw = entry ? entry[6] : document.getElementById('travel').value;
-      const daRaw = entry ? entry[7] : document.getElementById('da').value;
-      const daClaimRaw = entry ? entry[8] : document.getElementById('daClaim').value;
+      const date = entry ? entry[0] : document.getElementById("date").value;
+      const from = entry ? entry[1] : document.getElementById("from").value;
+      const to = entry ? entry[2] : document.getElementById("to").value;
+      const travelRaw = entry ? entry[6] : document.getElementById("travel").value;
+      const daRaw = entry ? entry[7] : document.getElementById("da").value;
+      const daClaimRaw = entry ? entry[8] : document.getElementById("daClaim").value;
 
       const travel = parseValue(travelRaw);
       const da = parseValue(daRaw);
@@ -167,7 +160,7 @@
       if (!date || !from || !to || isNaN(travel) || isNaN(da) || isNaN(daClaim)) return;
 
       entries.push([date, from, to, travel, da, daClaim, travelRaw, daRaw, daClaimRaw]);
-      renderTable();
+      saveAndRender();
       form.reset();
     }
 
@@ -189,7 +182,7 @@
       for (const key in grouped) {
         let totalTravel = 0, totalDA = 0, totalDAClaim = 0;
         grouped[key].forEach(({ row, index }) => {
-          const tr = document.createElement('tr');
+          const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>${row[0]}</td>
             <td>${row[1]} ➝ ${row[2]}</td>
@@ -206,7 +199,7 @@
           totalDAClaim += row[5];
         });
 
-        const sumRow = document.createElement('tr');
+        const sumRow = document.createElement("tr");
         sumRow.style.fontWeight = "bold";
         sumRow.innerHTML = `
           <td colspan="2">Subtotal</td>
@@ -222,20 +215,20 @@
 
     function editRow(index) {
       const row = entries[index];
-      document.getElementById('date').value = row[0];
-      document.getElementById('from').value = row[1];
-      document.getElementById('to').value = row[2];
-      document.getElementById('travel').value = row[6];
-      document.getElementById('da').value = row[7];
-      document.getElementById('daClaim').value = row[8];
+      document.getElementById("date").value = row[0];
+      document.getElementById("from").value = row[1];
+      document.getElementById("to").value = row[2];
+      document.getElementById("travel").value = row[6];
+      document.getElementById("da").value = row[7];
+      document.getElementById("daClaim").value = row[8];
       entries.splice(index, 1);
-      renderTable();
+      saveAndRender();
     }
 
     function deleteRow(index) {
       if (confirm("Are you sure you want to delete this entry?")) {
         entries.splice(index, 1);
-        renderTable();
+        saveAndRender();
       }
     }
 
@@ -244,6 +237,19 @@
       const totalDA = entries.reduce((sum, row) => sum + row[4], 0);
       const totalDAClaim = entries.reduce((sum, row) => sum + row[5], 0);
       totalsDisplay.innerText = `Total Travelling Cost: ₹${totalTravel.toFixed(2)} | Total DA: ₹${totalDA.toFixed(2)} | Total DA Claim: ₹${totalDAClaim.toFixed(2)}`;
+    }
+
+    function saveAndRender() {
+      localStorage.setItem("travelEntries", JSON.stringify(entries));
+      renderTable();
+    }
+
+    function newFile() {
+      if (confirm("This will clear all current entries. Proceed?")) {
+        entries = [];
+        localStorage.removeItem("travelEntries");
+        saveAndRender();
+      }
     }
 
     function exportToExcel() {
@@ -255,7 +261,7 @@
     }
 
     function importFromJSON() {
-      const file = document.getElementById('fileInput').files[0];
+      const file = document.getElementById("fileInput").files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function (e) {
@@ -263,7 +269,7 @@
           const importedData = JSON.parse(e.target.result);
           if (Array.isArray(importedData)) {
             entries = importedData;
-            renderTable();
+            saveAndRender();
           } else {
             alert("Invalid file format.");
           }
@@ -281,11 +287,14 @@
         body: JSON.stringify(entries),
         headers: { "Content-Type": "application/json" }
       })
-      .then(res => res.text())
-      .then(msg => alert("Data sent to Google Sheet successfully!"))
-      .catch(err => alert("Failed to send: " + err.message));
+        .then((res) => res.text())
+        .then((msg) => alert("Data sent to Google Sheet successfully!"))
+        .catch((err) => alert("Failed to send: " + err.message));
     }
-  </script>
 
+    // Initial load
+    saveAndRender();
+  </script>
+  
 </body>
 </html>
