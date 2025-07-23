@@ -6,7 +6,8 @@
     <title>Expense Tracker</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css">
+  
+     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
@@ -14,10 +15,12 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h3>Menu</h3>
-                
                 <button class="close-sidebar" id="closeSidebar">
                     <i class="fas fa-times"></i>
                 </button>
+            </div>
+            <div class="search-container" style="padding: 0 20px;">
+                <input type="text" id="sidebarSearch" class="search-input" placeholder="Search by date or place...">
             </div>
             <ul class="sidebar-menu">
                 <li id="homeLink">
@@ -45,20 +48,27 @@
                         <i class="fas fa-bars"></i>
                     </button>
                     <div class="logo">
-                        <img class="icon" src="Expense-Tracker-Icon-6.png" alt="Expense-Tracker-Icon-6.png">
+                       <img class="icon" src="Expense-Tracker-Icon-6.png" alt="Expense-Tracker-Icon-6.png" >
                         <h1>Expense Tracker</h1>
                     </div>
                 </div>
                 <div class="navbar-buttons">
+                    <button class="btn btn-primary" id="saveFileBtn">
+                        <i class="fas fa-save"></i> Save File
+                    </button>
                     <button class="btn btn-primary" id="downloadExcel">
                         <i class="fas fa-file-excel"></i> Download Excel
-                    </button>
-                    <button class="btn btn-success" id="exportGoogleSheet">
-                        <i class="fab fa-google-drive"></i> Export to Google Sheet
                     </button>
                     <button class="btn btn-warning" id="newFileBtn">
                         <i class="fas fa-file"></i> New File
                     </button>
+                    <label class="theme-switch">
+                        <input type="checkbox" id="themeToggle">
+                        <span class="slider">
+                            <i class="fas fa-moon"></i>
+                            <i class="fas fa-sun"></i>
+                        </span>
+                    </label>
                 </div>
             </nav>
 
@@ -155,7 +165,7 @@
                             </div>
                         </div>
 
-                        <div class="form-group" id="stayChargeGroup" >
+                        <div class="form-group" id="stayChargeGroup" style="display: none;">
                             <label for="stayCharge">Stay Charge</label>
                             <input type="number" id="stayCharge" class="form-control" placeholder="Enter charge amount">
                         </div>
@@ -244,7 +254,7 @@
             <div class="page" id="historyPage">
                 <div class="expense-form">
                     <h2 class="form-title">Recent Files</h2>
-                    <ul id="historyList">
+                    <ul id="historyList" style="list-style: none; padding: 0;">
                         <!-- History items will be added here dynamically -->
                     </ul>
                 </div>
@@ -254,10 +264,13 @@
             <div class="page" id="filesPage">
                 <div class="expense-form">
                     <h2 class="form-title">Your Files</h2>
-                    <div id="noFilesMessage" >
+                    <div class="search-container">
+                        <input type="text" id="filesSearch" class="search-input" placeholder="Search files by name...">
+                    </div>
+                    <div id="noFilesMessage" style="text-align: center; padding: 20px; display: none;">
                         <p>No files saved yet.</p>
                     </div>
-                    <table class="expense-table" id="filesTable" >
+                    <table class="expense-table" id="filesTable" style="width: 100%;">
                         <thead>
                             <tr>
                                 <th>File Name</th>
@@ -299,7 +312,7 @@
                                     <option value="select">Dropdown</option>
                                 </select>
                             </div>
-                            <div class="form-group" id="optionsGroup" >
+                            <div class="form-group" id="optionsGroup" style="display: none;">
                                 <label for="columnOptions">Options (comma separated)</label>
                                 <input type="text" id="columnOptions" class="form-control" placeholder="Option1, Option2, Option3">
                             </div>
@@ -314,7 +327,7 @@
                     <button class="btn btn-success" id="createCustomTableBtn">Create Table</button>
                 </div>
                 
-                <div id="customTableContainer" >
+                <div id="customTableContainer" style="display: none;">
                     <div class="expense-form">
                         <h2 class="form-title" id="customTableTitle">Custom Table</h2>
                         <form id="customTableForm">
@@ -333,12 +346,12 @@
                         </table>
                     </div>
                     
-                    <div class="navbar-buttons">
+                    <div class="navbar-buttons" style="margin-top: 20px;">
+                        <button class="btn btn-primary" id="saveCustomFileBtn">
+                            <i class="fas fa-save"></i> Save Custom File
+                        </button>
                         <button class="btn btn-primary" id="downloadCustomExcel">
                             <i class="fas fa-file-excel"></i> Download Excel
-                        </button>
-                        <button class="btn btn-warning" id="saveCustomFileBtn">
-                            <i class="fas fa-save"></i> Save Custom File
                         </button>
                     </div>
                 </div>
@@ -385,6 +398,7 @@
             </div>
         </div>
     </div>
-<script src="script.js"></script>
+
+   <script src="script.js"></script>
 </body>
 </html>

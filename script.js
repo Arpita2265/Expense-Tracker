@@ -9,7 +9,7 @@
             const expenseForm = document.getElementById('expenseForm');
             const expenseTableBody = document.getElementById('expenseTableBody');
             const downloadExcelBtn = document.getElementById('downloadExcel');
-            const exportGoogleSheetBtn = document.getElementById('exportGoogleSheet');
+            const saveFileBtn = document.getElementById('saveFileBtn');
             const newFileBtn = document.getElementById('newFileBtn');
             const saveFileModal = document.getElementById('saveFileModal');
             const closeSaveModal = document.getElementById('closeSaveModal');
@@ -35,6 +35,9 @@
             const stayYesRadio = document.getElementById('stayYes');
             const stayNoRadio = document.getElementById('stayNo');
             const stayChargeGroup = document.getElementById('stayChargeGroup');
+            const themeToggle = document.getElementById('themeToggle');
+            const sidebarSearch = document.getElementById('sidebarSearch');
+            const filesSearch = document.getElementById('filesSearch');
             
             // Custom Page Elements
             const columnNameInput = document.getElementById('columnName');
@@ -80,6 +83,12 @@
 
             // Initialize the app
             function init() {
+                // Check for saved theme preference
+                if (localStorage.getItem('darkMode') === 'enabled') {
+                    document.body.classList.add('dark-mode');
+                    themeToggle.checked = true;
+                }
+                
                 // Load the most recent file if available
                 if (history.length > 0) {
                     const lastFileId = history[0].id;
@@ -92,6 +101,17 @@
                 // Load pages
                 loadPage('home');
             }
+
+            // Theme toggle
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('darkMode', 'enabled');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('darkMode', 'disabled');
+                }
+            });
 
             // Sidebar toggle
             menuToggle.addEventListener('click', function() {
@@ -205,35 +225,38 @@
                 const destination = `${from} ➝ ${to}`;
                 
                 let formattedTravellingCost = travellingCost;
-                if (ticket === 'Available') {
-                    formattedTravellingCost = `Ticket ➝ ${ticket}\n${formattedTravellingCost}`;
-                }
+                formattedTravellingCost = `Ticket ➝ ${ticket}\n${formattedTravellingCost}`;
                 
                 let formattedTravellingClaim = travellingClaim;
-                if (ticketClaim === 'Available') {
-                    formattedTravellingClaim = `Ticket ➝ ${ticketClaim}\n${formattedTravellingClaim}`;
+                formattedTravellingClaim = `Ticket ➝ ${ticketClaim}\n${formattedTravellingClaim}`;
+                
+                // Calculate DA sum with proper format
+                let daSum = 0;
+                let formattedDA = da;
+                if (da.includes('➝')) {
+                    const daItems = da.split('+');
+                    daSum = daItems.reduce((sum, item) => {
+                        const parts = item.split('➝');
+                        const value = parts.length > 1 ? parseFloat(parts[1].trim()) || 0 : parseFloat(parts[0].trim()) || 0;
+                        return sum + value;
+                    }, 0);
+                    formattedDA = `${da}= ${daSum}`;
+                } else {
+                    daSum = calculateSum(da);
+                    formattedDA = da;
                 }
                 
-                let formattedDA = da;
-                if (daReceipt === 'Available') {
-                    formattedDA = `Receipt ➝ ${daReceipt}\n${formattedDA}`;
-                }
+                formattedDA = `Receipt ➝ ${daReceipt}\n${formattedDA}`;
                 
                 let formattedDAClaim = daClaim;
                 if (stay === 'Yes') {
                     formattedDAClaim = `Stay ➝ ${stayCharge}\n${formattedDAClaim}`;
                 }
-                if (daClaimReceipt === 'Available') {
-                    formattedDAClaim = `Receipt ➝ ${daClaimReceipt}\n${formattedDAClaim}`;
-                }
+                formattedDAClaim = `Receipt ➝ ${daClaimReceipt}\n${formattedDAClaim}`;
                 
                 // Calculate sums
                 const travellingCostSum = calculateSum(travellingCost);
                 const travellingClaimSum = calculateSum(travellingClaim);
-                const daSum = calculateSum(da.split('+').map(item => {
-                    const parts = item.split('➝');
-                    return parts.length > 1 ? parts[1].trim() : parts[0].trim();
-                }).join('+'));
                 let daClaimSum = calculateSum(daClaim);
                 if (stay === 'Yes') {
                     daClaimSum += parseFloat(stayCharge) || 0;
@@ -280,20 +303,9 @@
                 if (!valueString) return 0;
                 
                 try {
-                    // Handle DA format (Breakfast➝50+Lunch➝120)
-                    if (valueString.includes('➝')) {
-                        const items = valueString.split('+');
-                        return items.reduce((sum, item) => {
-                            const parts = item.split('➝');
-                            const value = parts.length > 1 ? parseFloat(parts[1].trim()) || 0 : parseFloat(parts[0].trim()) || 0;
-                            return sum + value;
-                        }, 0);
-                    } else {
-                        // Handle simple format (100+50+30)
-                        return valueString.split('+').reduce((sum, val) => {
-                            return sum + (parseFloat(val.trim()) || 0);
-                        }, 0);
-                    }
+                    return valueString.split('+').reduce((sum, val) => {
+                        return sum + (parseFloat(val.trim()) || 0);
+                    }, 0);
                 } catch (e) {
                     console.error('Error calculating sum:', e);
                     return 0;
@@ -308,6 +320,14 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `<td colspan="8" style="text-align: center;">No expenses added yet</td>`;
                     expenseTableBody.appendChild(row);
+                    
+                    // Reset subtotals
+                    document.getElementById('subtotalTravellingCost').textContent = '0';
+                    document.getElementById('subtotalTravellingClaim').textContent = '0';
+                    document.getElementById('subtotalDA').textContent = '0';
+                    document.getElementById('subtotalDAClaim').textContent = '0';
+                    document.getElementById('subtotalTotalClaim').textContent = '0';
+                    
                     return;
                 }
                 
@@ -476,7 +496,8 @@
                 if (expense.da.includes('Receipt ➝ Available')) {
                     daReceipt = 'Available';
                 }
-                let da = expense.da.replace(`Receipt ➝ ${daReceipt}\n`, '');
+                let da = expense.da.split('=')[0].trim(); // Remove the sum part
+                da = da.replace(`Receipt ➝ ${daReceipt}\n`, '');
                 
                 // Extract DA claim receipt and stay information
                 let daClaimReceipt = 'Not Available';
@@ -608,36 +629,29 @@
                 XLSX.writeFile(wb, fileName);
             });
 
-            // Export to Google Sheet (mock implementation)
-            exportGoogleSheetBtn.addEventListener('click', function() {
-                alert('This would export to Google Sheets in a real implementation. For this demo, you can use the Excel download.');
+            // Save file button
+            saveFileBtn.addEventListener('click', function() {
+                if (expenses.length === 0) {
+                    alert('No data to save');
+                    return;
+                }
+                
+                const fileName = prompt('Enter a name for your file:', currentFile.name);
+                
+                if (fileName) {
+                    saveCurrentFileAs(fileName);
+                    alert(`File "${fileName}" saved successfully!`);
+                }
             });
 
             // New file button
             newFileBtn.addEventListener('click', function() {
-                if (expenses.length > 0) {
-                    // Show save file modal
-                    saveFileModal.classList.add('open');
-                } else {
-                    // No data to save, just create a new file
+                if (expenses.length > 0 && confirm('Are you sure you want to create a new file? The current file will be saved automatically.')) {
+                    saveCurrentFile();
+                    createNewFile();
+                } else if (expenses.length === 0) {
                     createNewFile();
                 }
-            });
-
-            // Save file modal
-            closeSaveModal.addEventListener('click', function() {
-                saveFileModal.classList.remove('open');
-            });
-
-            cancelSave.addEventListener('click', function() {
-                saveFileModal.classList.remove('open');
-            });
-
-            confirmSave.addEventListener('click', function() {
-                const fileName = fileNameInput.value.trim() || 'Untitled';
-                saveCurrentFileAs(fileName);
-                saveFileModal.classList.remove('open');
-                createNewFile();
             });
 
             // Save current file with a new name
@@ -664,15 +678,15 @@
                     files.push(fileToSave);
                 }
                 
+                // Update current file name
+                currentFile.name = fileName;
+                
                 // Add to history
                 addToHistory(fileId);
                 
                 // Save to localStorage
                 localStorage.setItem('expenseFiles', JSON.stringify(files));
                 localStorage.setItem('expenseHistory', JSON.stringify(history));
-                
-                // Show success message
-                alert(`File "${fileName}" saved successfully!`);
             }
 
             // Save current file (without changing name)
@@ -761,7 +775,7 @@
                             
                             li.addEventListener('click', function() {
                                 loadFile(file.id);
-                                loadPage('home');
+                                loadPage(file.type === 'custom' ? 'custom' : 'home');
                             });
                             
                             historyList.appendChild(li);
@@ -791,7 +805,7 @@
                                 <div class="action-buttons">
                                     <button class="action-btn rename-btn" data-id="${file.id}">Rename</button>
                                     <button class="action-btn delete-btn" data-id="${file.id}">Delete</button>
-                                    <button class="action-btn load-btn" data-id="${file.id}">Load</button>
+                                    <button class="action-btn edit-btn" data-id="${file.id}">Edit</button>
                                 </div>
                             </td>
                         `;
@@ -803,7 +817,7 @@
                     document.querySelectorAll('.rename-btn').forEach(btn => {
                         btn.addEventListener('click', function() {
                             const id = parseInt(this.getAttribute('data-id'));
-                            editFile(id);
+                            renameFile(id);
                         });
                     });
                     
@@ -814,69 +828,39 @@
                         });
                     });
                     
-                    document.querySelectorAll('.load-btn').forEach(btn => {
+                    document.querySelectorAll('.edit-btn').forEach(btn => {
                         btn.addEventListener('click', function() {
                             const id = parseInt(this.getAttribute('data-id'));
                             loadFile(id);
-                            loadPage(file.type === 'custom' ? 'custom' : 'home');
+                            loadPage('home');
                         });
                     });
                 }
             }
 
-            // Edit file name
-            function editFile(id) {
+            // Rename file
+            function renameFile(id) {
                 const file = files.find(f => f.id === id);
                 if (!file) return;
                 
-                fileToEdit = file;
-                editFileNameInput.value = file.name;
-                editFileModal.classList.add('open');
+                const newName = prompt('Enter new name for the file:', file.name);
+                
+                if (newName && newName.trim() !== '') {
+                    file.name = newName.trim();
+                    file.updatedAt = new Date();
+                    
+                    // If this is the current file, update the current file reference
+                    if (currentFile.id === file.id) {
+                        currentFile.name = newName.trim();
+                    }
+                    
+                    // Save to localStorage
+                    localStorage.setItem('expenseFiles', JSON.stringify(files));
+                    
+                    // Refresh files list
+                    renderFilesList();
+                }
             }
-
-            // Close edit modal
-            closeEditModal.addEventListener('click', function() {
-                editFileModal.classList.remove('open');
-                fileToEdit = null;
-            });
-
-            cancelEdit.addEventListener('click', function() {
-                editFileModal.classList.remove('open');
-                fileToEdit = null;
-            });
-
-            // Confirm edit
-            confirmEdit.addEventListener('click', function() {
-                if (!fileToEdit) return;
-                
-                const newName = editFileNameInput.value.trim();
-                if (!newName) {
-                    alert('Please enter a file name');
-                    return;
-                }
-                
-                fileToEdit.name = newName;
-                fileToEdit.updatedAt = new Date();
-                
-                // Update in files array
-                const index = files.findIndex(f => f.id === fileToEdit.id);
-                if (index !== -1) {
-                    files[index] = fileToEdit;
-                }
-                
-                // Save to localStorage
-                localStorage.setItem('expenseFiles', JSON.stringify(files));
-                
-                // If this is the current file, update the current file reference
-                if (currentFile.id === fileToEdit.id) {
-                    currentFile.name = newName;
-                }
-                
-                // Close modal and refresh files list
-                editFileModal.classList.remove('open');
-                fileToEdit = null;
-                renderFilesList();
-            });
 
             // Delete file
             function deleteFile(id) {
@@ -919,8 +903,12 @@
                     customTableData = file.data;
                     
                     // Render the custom table
+                    customTableNameInput.value = file.name;
+                    customTableTitle.textContent = file.name;
+                    renderColumnList();
                     renderCustomTableForm();
                     renderCustomTable();
+                    customTableContainer.style.display = 'block';
                 }
                 
                 // Add to history
@@ -1011,6 +999,11 @@
                 }
                 
                 currentCustomFile.name = tableName;
+                currentCustomFile.columns = [...customColumns];
+                currentCustomFile.data = [];
+                currentCustomFile.createdAt = new Date();
+                currentCustomFile.updatedAt = new Date();
+                
                 customTableTitle.textContent = tableName;
                 
                 // Render the form and table
@@ -1146,7 +1139,6 @@
                 
                 // Update current custom file data
                 currentCustomFile.data = customTableData;
-                currentCustomFile.columns = customColumns;
                 currentCustomFile.updatedAt = new Date();
                 
                 // Save to localStorage
@@ -1247,7 +1239,8 @@
                             });
                             break;
                         case 'radio':
-                            document.querySelector(`input[name="custom-${column.id}"][value="${row[column.id]}"]`).checked = true;
+                            const radio = document.querySelector(`input[name="custom-${column.id}"][value="${row[column.id]}"]`);
+                            if (radio) radio.checked = true;
                             break;
                     }
                 });
@@ -1352,6 +1345,137 @@
                     alert(`File "${fileName}" saved successfully!`);
                 }
             });
+
+            // Search functionality
+            sidebarSearch.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                if (searchTerm === '') {
+                    renderExpenseTable();
+                    return;
+                }
+                
+                const filteredExpenses = expenses.filter(expense => 
+                    expense.date.toLowerCase().includes(searchTerm) || 
+                    expense.destination.toLowerCase().includes(searchTerm)
+                );
+                
+                renderFilteredExpenses(filteredExpenses);
+            });
+
+            function renderFilteredExpenses(filteredExpenses) {
+                expenseTableBody.innerHTML = '';
+                
+                if (filteredExpenses.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td colspan="8" style="text-align: center;">No matching expenses found</td>`;
+                    expenseTableBody.appendChild(row);
+                    return;
+                }
+                
+                filteredExpenses.forEach(expense => {
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td>${expense.date}</td>
+                        <td>${formatMultiline(expense.destination)}</td>
+                        <td>${formatMultiline(expense.travellingCost)}<br><strong>${expense.travellingCostSum.toFixed(2)}</strong></td>
+                        <td>${formatMultiline(expense.travellingClaim)}<br><strong>${expense.travellingClaimSum.toFixed(2)}</strong></td>
+                        <td>${formatMultiline(expense.da)}<br><strong>${expense.daSum.toFixed(2)}</strong></td>
+                        <td>${formatMultiline(expense.daClaim)}<br><strong>${expense.daClaimSum.toFixed(2)}</strong></td>
+                        <td><strong>${expense.totalClaim.toFixed(2)}</strong></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="action-btn edit-btn" data-id="${expense.id}">Edit</button>
+                                <button class="action-btn delete-btn" data-id="${expense.id}">Delete</button>
+                            </div>
+                        </td>
+                    `;
+                    
+                    expenseTableBody.appendChild(row);
+                });
+                
+                // Add event listeners to action buttons
+                document.querySelectorAll('.edit-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.getAttribute('data-id'));
+                        editExpense(id);
+                    });
+                });
+                
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.getAttribute('data-id'));
+                        deleteExpense(id);
+                    });
+                });
+            }
+
+            filesSearch.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                if (searchTerm === '') {
+                    renderFilesList();
+                    return;
+                }
+                
+                const filteredFiles = files.filter(file => 
+                    file.name.toLowerCase().includes(searchTerm)
+                );
+                
+                renderFilteredFiles(filteredFiles);
+            });
+
+            function renderFilteredFiles(filteredFiles) {
+                filesTableBody.innerHTML = '';
+                
+                if (filteredFiles.length === 0) {
+                    noFilesMessage.style.display = 'block';
+                    filesTable.style.display = 'none';
+                } else {
+                    noFilesMessage.style.display = 'none';
+                    filesTable.style.display = 'table';
+                    
+                    filteredFiles.forEach(file => {
+                        const row = document.createElement('tr');
+                        
+                        row.innerHTML = `
+                            <td>${file.name}</td>
+                            <td>${new Date(file.createdAt).toLocaleDateString()}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="action-btn rename-btn" data-id="${file.id}">Rename</button>
+                                    <button class="action-btn delete-btn" data-id="${file.id}">Delete</button>
+                                    <button class="action-btn edit-btn" data-id="${file.id}">Edit</button>
+                                </div>
+                            </td>
+                        `;
+                        
+                        filesTableBody.appendChild(row);
+                    });
+                    
+                    // Add event listeners to action buttons
+                    document.querySelectorAll('.rename-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const id = parseInt(this.getAttribute('data-id'));
+                            renameFile(id);
+                        });
+                    });
+                    
+                    document.querySelectorAll('.delete-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const id = parseInt(this.getAttribute('data-id'));
+                            deleteFile(id);
+                        });
+                    });
+                    
+                    document.querySelectorAll('.edit-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const id = parseInt(this.getAttribute('data-id'));
+                            loadFile(id);
+                            loadPage('home');
+                        });
+                    });
+                }
+            }
 
             // Initialize the app
             init();
